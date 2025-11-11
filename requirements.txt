@@ -1,0 +1,7 @@
+Flask>=2.2.0
+pymongo>=4.0.0
+flask-login>=0.6.0
+Werkzeug>=2.2.0
+# Optional / environment-specific (uncomment if needed):
+# dnspython>=2.0.0  # required if you use mongodb+srv:// URIs
+# gunicorn>=20.0.0  # production WSGI server (for Linux deployments)
