@@ -4,48 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>College ERP System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='navbar.css') }}">
   <style>
     * {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
     }
-    /* Navigation Bar */
-    .navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(90deg, #3f2b96, #a8c0ff);
-    color: #fff;
-    padding: 18px 40px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-    }
-    body {
+    
+     body {
       background-image: url(https://th.bing.com/th/id/R.3798ff40d2c811d1754cff99e0fabbf1?rik=KkFP5oNp%2byc4Vw&riu=http%3a%2f%2fwww.agmrcet.ac.in%2fimg%2fslider%2f6.png&ehk=s5JubllWIS7FED71N3hcy0BRpS7tURy0pqBrc2TBYLs%3d&risl=&pid=ImgRaw&r=0);
       background-size: cover;
       background-repeat: no-repeat;
       background-position: center;
     }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .logo img {
-      width: 50px;
-    }
-
-    .logo h1 {
-      font-size: 1.3em;
-      font-weight: 600;
-    }
     /* Hero Section */
     .hero {
-      height: 75vh;
+      height: 70vh;
       color: rgb(247, 255, 6);
       display: flex;
       justify-content: center;
@@ -63,8 +37,8 @@
       opacity: 0.8;
     }
     .login-options {
-      display: flex;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 30px;
       margin-top: 50px;
     }
@@ -73,8 +47,8 @@
       background-color: white;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      padding: 50px;
-      width: 320px;
+      padding: 20px;
+      width: 250px;
       text-align: center;
       transition: transform 0.3s ease;
     }
@@ -115,7 +89,7 @@
 </head>
 <body>
   <header class="navbar">
-    <div class="logo">
+    <div class="logo-section">
       <img src="https://tse4.mm.bing.net/th/id/OIP.LRim0dz7N2w2dTImQCh08gHaHa?rs=1&pid=ImgDetMain&o=7&rm=3" alt="College Logo">
       <h1>AGMR COLLEGE OF ENGINEERING AND TECHNOLOGY</h1>
     </div>

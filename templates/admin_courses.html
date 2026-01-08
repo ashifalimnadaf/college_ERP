@@ -129,9 +129,29 @@
       <form method="POST" action="{{ url_for('admin_courses_create') }}" class="grid">
         <div><label>Code</label><input name="code" required></div>
         <div><label>Name</label><input name="name" required></div>
-        <div><label>Department</label><input name="department" required></div>
+        <div>
+          <label>Department</label>
+          <select name="department" required>
+            <option value="">Select Department</option>
+            <option value="Computer Science">Computer Science</option>
+            <option value="Information Science">Information Science</option>
+            <option value="Electronics and Communication">Electronics and Communication</option>
+            <option value="Electrical and Electronics">Electrical and Electronics</option>
+            <option value="Mechanical Engineering">Mechanical Engineering</option>
+            <option value="Civil Engineering">Civil Engineering</option>
+            <option value="Artificial Intelligence">Artificial Intelligence</option>
+          </select>
+        </div>
         <div><label>Credits</label><input name="credits" type="number" min="0" required></div>
-        <div><label>Semester</label><input name="semester" required></div>
+        <div>
+          <label>Semester</label>
+          <select name="semester" required>
+            <option value="">Select Semester</option>
+            {% for i in range(1, 9) %}
+            <option value="{{ i }}">Semester {{ i }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <div><label>Description</label><textarea name="description"></textarea></div>
         <div style="grid-column: span 2;">
           <label>Instructors</label>
@@ -165,9 +185,21 @@
               <td>
                 <form method="POST" action="{{ url_for('admin_courses_edit', course_id=c._id) }}" style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;">
                   <input name="name" value="{{ c.name }}">
-                  <input name="department" value="{{ c.department }}">
+                  <select name="department">
+                    <option value="Computer Science" {% if c.department == 'Computer Science' %}selected{% endif %}>CSE</option>
+                    <option value="Information Science" {% if c.department == 'Information Science' %}selected{% endif %}>ISE</option>
+                    <option value="Electronics and Communication" {% if c.department == 'Electronics and Communication' %}selected{% endif %}>ECE</option>
+                    <option value="Electrical and Electronics" {% if c.department == 'Electrical and Electronics' %}selected{% endif %}>EEE</option>
+                    <option value="Mechanical Engineering" {% if c.department == 'Mechanical Engineering' %}selected{% endif %}>Mech</option>
+                    <option value="Civil Engineering" {% if c.department == 'Civil Engineering' %}selected{% endif %}>Civil</option>
+                    <option value="Artificial Intelligence" {% if c.department == 'Artificial Intelligence' %}selected{% endif %}>AI</option>
+                  </select>
                   <input name="credits" type="number" value="{{ c.credits }}">
-                  <input name="semester" value="{{ c.semester }}">
+                  <select name="semester">
+                    {% for i in range(1, 9) %}
+                    <option value="{{ i }}" {% if c.semester|string == i|string %}selected{% endif %}>{{ i }}</option>
+                    {% endfor %}
+                  </select>
                   <input name="description" value="{{ c.description }}">
                   <button class="btn btn-primary" type="submit">Save</button>
                 </form>

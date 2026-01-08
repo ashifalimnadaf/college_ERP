@@ -160,18 +160,8 @@ header {
               <td>{{ u.email }}</td>
               <td>{{ u.role }}</td>
               <td>
-                <form method="POST" action="{{ url_for('admin_users_edit', user_id=u._id) }}" style="display:inline-grid; grid-template-columns:repeat(5,1fr); gap:8px;">
-                  <input name="name" value="{{ u.name }}">
-                  <input name="email" value="{{ u.email }}">
-                  <select name="role">
-                    <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
-                    <option value="teacher" {% if u.role=='teacher' %}selected{% endif %}>Teacher</option>
-                    <option value="student" {% if u.role=='student' %}selected{% endif %}>Student</option>
-                  </select>
-                  <input name="password" type="password" placeholder="New Password">
-                  <button class="btn btn-primary" type="submit">Save</button>
-                </form>
-                <form method="POST" action="{{ url_for('admin_users_delete', user_id=u._id) }}" style="display:inline; margin-left:8px;" onsubmit="return confirm('Delete this user?');">
+                <a href="{{ url_for('admin_users_details', user_id=u._id) }}" class="btn btn-primary" style="text-decoration:none; display:inline-block; margin-right:8px;">Edit</a>
+                <form method="POST" action="{{ url_for('admin_users_delete', user_id=u._id) }}" style="display:inline;" onsubmit="return confirm('Delete this user?');">
                   <button class="btn btn-danger" type="submit">Delete</button>
                 </form>
               </td>

@@ -9,7 +9,7 @@ import ssl
 
 
 
-app = Flask(__name__, static_folder='statics', template_folder='templates')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.urandom(24)
 
 # MongoDB Atlas connection
@@ -41,6 +41,10 @@ courses_collection = db["courses"]
 settings_collection = db["settings"]
 timetable_collection = db["timetable"]
 classes_collection = db["classes"]
+leaves_collection = db["leaves"]
+assignments_collection = db["assignments"]
+exams_collection = db["exams"]
+fees_collection = db["fees"]
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -216,18 +220,48 @@ def admin_users_create():
     flash('User created', 'success')
     return redirect(url_for('admin_users'))
 
-@app.route('/admin/users/<user_id>/edit', methods=['POST'])
+@app.route('/admin/users/<user_id>/details')
 @login_required
-def admin_users_edit(user_id):
+def admin_users_details(user_id):
+    if current_user.role != "admin":
+        return redirect(url_for('home'))
+    
+    user = admins_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        user = teachers_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        user = students_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+        
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_users'))
+        
+    return render_template('admin_user_details.html', user=user)
+
+@app.route('/admin/users/<user_id>/update', methods=['POST'])
+@login_required
+def admin_users_update(user_id):
     if current_user.role != "admin":
         return redirect(url_for('home'))
     name = request.form.get('name','').strip()
     email = request.form.get('email','').strip()
     role = request.form.get('role','').strip()
     password = request.form.get('password','').strip()
+    
     update = {"name": name, "email": email, "role": role, "updated_at": datetime.now()}
     if password:
         update["password"] = generate_password_hash(password)
+
+    # Handle role-specific fields
+    if role == 'student':
+        update['roll_number'] = request.form.get('roll_number','').strip()
+        update['class'] = request.form.get('class_name','').strip()
+    elif role == 'teacher':
+        update['subjects'] = [s.strip() for s in request.form.get('subjects','').split(',') if s.strip()]
+        update['classes'] = [c.strip() for c in request.form.get('classes','').split(',') if c.strip()]
+
     src = None
     current_doc = admins_collection.find_one({"_id": ObjectId(user_id)})
     if current_doc:
@@ -246,6 +280,7 @@ def admin_users_edit(user_id):
     if not current_doc:
         flash('User not found', 'danger')
         return redirect(url_for('admin_users'))
+    
     if role == src or role is None:
         if src == 'admin':
             admins_collection.update_one({"_id": ObjectId(user_id)}, {"$set": update})
@@ -259,6 +294,15 @@ def admin_users_edit(user_id):
         new_doc = current_doc.copy()
         new_doc.update(update)
         new_doc["_id"] = ObjectId(user_id)
+        
+        # Cleanup fields if changing roles
+        if role != 'student':
+            new_doc.pop('roll_number', None)
+            new_doc.pop('class', None)
+        if role != 'teacher':
+            new_doc.pop('subjects', None)
+            new_doc.pop('classes', None) # Note: 'classes' field conflict in teacher vs student? Student has 'class', Teacher has 'classes' list.
+            
         if src == 'admin':
             admins_collection.delete_one({"_id": ObjectId(user_id)})
         elif src == 'teacher':
@@ -267,12 +311,14 @@ def admin_users_edit(user_id):
             students_collection.delete_one({"_id": ObjectId(user_id)})
         else:
             users_collection.delete_one({"_id": ObjectId(user_id)})
+            
         if role == 'admin':
             admins_collection.insert_one(new_doc)
         elif role == 'teacher':
             teachers_collection.insert_one(new_doc)
         elif role == 'student':
             students_collection.insert_one(new_doc)
+            
     flash('User updated', 'success')
     return redirect(url_for('admin_users'))
 
@@ -697,7 +743,7 @@ def admin_settings():
 @app.route('/notifications/manage', methods=['GET', 'POST'])
 @login_required
 def manage_notifications():
-    if current_user.role not in ["admin", "teacher"]:
+    if current_user.role not in ["admin"]:
         return redirect(url_for('home'))
     if request.method == 'POST':
         title = request.form.get('title','').strip()
@@ -755,7 +801,10 @@ def edit_notification(notif_id):
         "updated_at": datetime.now()
     }})
     flash('Notification updated', 'success')
-    return redirect(url_for('manage_notifications'))
+    if current_user.role == 'admin':
+        return redirect(url_for('manage_notifications'))
+    else:
+        return redirect(url_for('teacher_notifications'))
 
 @app.route('/notifications/<notif_id>/delete', methods=['POST'])
 @login_required
@@ -764,7 +813,10 @@ def delete_notification(notif_id):
         return redirect(url_for('home'))
     notifications_collection.delete_one({"_id": ObjectId(notif_id)})
     flash('Notification deleted', 'success')
-    return redirect(url_for('manage_notifications'))
+    if current_user.role == 'admin':
+        return redirect(url_for('manage_notifications'))
+    else:
+        return redirect(url_for('teacher_notifications'))
 
 @app.route('/student/notifications')
 @login_required
@@ -859,7 +911,8 @@ def teacher_dashboard():
         aud = n.get('audience')
         if aud == 'all' or (aud == 'class' and n.get('class') in classes):
             items.append(n)
-    return render_template('teacher_dashboard.html', user=current_user, notifications=items[:5])
+            
+    teacher_id = current_user.id
     notes_count = notes_collection.count_documents({"teacher_id": teacher_id})
     syllabus_count = syllabus_collection.count_documents({"teacher_id": teacher_id})
     
@@ -892,7 +945,214 @@ def teacher_dashboard():
                           user=current_user,
                           notes_count=notes_count,
                           syllabus_count=syllabus_count,
-                          activities=activities[:5])
+                          activities=activities[:5],
+                          notifications=items[:5])
+
+@app.route('/teacher/notifications', methods=['GET', 'POST'])
+@login_required
+def teacher_notifications():
+    if current_user.role != "teacher":
+        return redirect(url_for('home'))
+        
+    if request.method == 'POST':
+        if 'delete' in request.form:
+            notif_id = request.form.get('notif_id')
+            notifications_collection.delete_one({"_id": ObjectId(notif_id), "author_id": current_user.id})
+            flash('Notification deleted', 'success')
+        else:
+            title = request.form.get('title')
+            message = request.form.get('message')
+            audience = request.form.get('audience') # 'all' or 'class'
+            target_class = request.form.get('class') if audience == 'class' else None
+            priority = request.form.get('priority', 'normal')
+            
+            notifications_collection.insert_one({
+                "title": title,
+                "message": message,
+                "audience": audience,
+                "class": target_class,
+                "priority": priority,
+                "author_id": current_user.id,
+                "author_name": current_user.name,
+                "created_at": datetime.now(),
+                "expires_at": None # Can add expiration logic later
+            })
+            flash('Notification posted', 'success')
+        return redirect(url_for('teacher_notifications'))
+        
+    my_notifications = list(notifications_collection.find({"author_id": current_user.id}).sort("created_at", -1))
+    return render_template('manage_notifications.html', notifications=my_notifications, classes=current_user.user_data.get('classes', []))
+
+
+# -------------------------------
+# Leave Application Routes
+# -------------------------------
+@app.route('/student/leaves', methods=['GET', 'POST'])
+@login_required
+def student_leaves():
+    if current_user.role != "student":
+        return redirect(url_for('home'))
+        
+    if request.method == 'POST':
+        leave_type = request.form.get('type')
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        reason = request.form.get('reason')
+        
+        leaves_collection.insert_one({
+            "student_id": current_user.id,
+            "student_name": current_user.name,
+            "type": leave_type,
+            "start_date": start_date,
+            "end_date": end_date,
+            "reason": reason,
+            "status": "pending",
+            "applied_on": datetime.now(),
+            "department": current_user.user_data.get('department'),
+            "year": current_user.user_data.get('year'),
+            "division": current_user.user_data.get('division')
+        })
+        flash('Leave application submitted successfully', 'success')
+        return redirect(url_for('student_leaves'))
+        
+    my_leaves = list(leaves_collection.find({"student_id": current_user.id}).sort("applied_on", -1))
+    return render_template('student_leaves.html', user=current_user, leaves=my_leaves)
+
+@app.route('/teacher/leaves', methods=['GET', 'POST'])
+@login_required
+def teacher_leave_approval():
+    if current_user.role != "teacher":
+        return redirect(url_for('home'))
+        
+    if request.method == 'POST':
+        leave_id = request.form.get('leave_id')
+        action = request.form.get('action') # 'approve' or 'reject'
+        
+        new_status = 'approved' if action == 'approve' else 'rejected'
+        leaves_collection.update_one(
+            {"_id": ObjectId(leave_id)},
+            {"$set": {"status": new_status}}
+        )
+        flash(f'Leave application {new_status}', 'success')
+        return redirect(url_for('teacher_leave_approval'))
+    
+    # Teachers can see leaves from their classes or all pending leaves for simplicity in this version
+    # Enhancing to filter by teacher's classes could be a future step
+    pending_leaves = list(leaves_collection.find({"status": "pending"}).sort("applied_on", -1))
+    return render_template('teacher_leave_approval.html', user=current_user, leaves=pending_leaves)
+
+# -------------------------------
+# Profile Routes
+# -------------------------------
+@app.route('/teacher/profile/view')
+@login_required
+def teacher_profile_view():
+    if current_user.role != "teacher":
+        return redirect(url_for('home'))
+    return render_template('teacher_profile.html', user=current_user)
+
+
+# -------------------------------
+# Assignment Routes
+# -------------------------------
+@app.route('/teacher/assignments', methods=['GET', 'POST'])
+@login_required
+def teacher_assignments():
+    if current_user.role != "teacher":
+        return redirect(url_for('home'))
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        target_class = request.form.get('class')
+        due_date = request.form.get('due_date')
+        
+        assignments_collection.insert_one({
+            "title": title,
+            "description": description,
+            "class": target_class,
+            "due_date": due_date,
+            "teacher_id": current_user.id,
+            "teacher_name": current_user.name,
+            "created_at": datetime.now(),
+            "submissions": [] # Array to store student submissions
+        })
+        flash('Assignment created successfully', 'success')
+        return redirect(url_for('teacher_assignments'))
+        
+    my_assignments = list(assignments_collection.find({"teacher_id": current_user.id}).sort("created_at", -1))
+    return render_template('teacher_assignments.html', user=current_user, assignments=my_assignments, classes=current_user.user_data.get('classes', []))
+
+@app.route('/student/assignments', methods=['GET', 'POST'])
+@login_required
+def student_assignments():
+    if current_user.role != "student":
+        return redirect(url_for('home'))
+    
+    student_class = current_user.user_data.get('division') # Assuming division is used for class mapping
+    # Fallback to department/year if division is not standard, but for now simple match
+    # Or fetch all assignments where class matches student's class
+    
+    # Logic: Get assignments for student's class (division) or department/year combo
+    # For simplicity, assuming 'class' field in assignment matches 'division' or similar identifier
+    # Ideally, we should match exact course/subject, but we'll use a broader filter for now
+    
+    # We will search for assignments where 'class' matches student's division 
+    # OR where 'class' matches "{year} - {department}" etc. depending on convention
+    
+    # Let's assume teacher selects a class from their list which are divisions.
+    student_division = current_user.user_data.get('division')
+    
+    if request.method == 'POST':
+        assignment_id = request.form.get('assignment_id')
+        content = request.form.get('content')
+        
+        # Check if already submitted
+        assignment = assignments_collection.find_one({"_id": ObjectId(assignment_id)})
+        already_submitted = False
+        for sub in assignment.get('submissions', []):
+            if sub.get('student_id') == current_user.id:
+                already_submitted = True
+                break
+        
+        if not already_submitted:
+            submission = {
+                "student_id": current_user.id,
+                "student_name": current_user.name,
+                "content": content,
+                "submitted_at": datetime.now()
+            }
+            assignments_collection.update_one(
+                {"_id": ObjectId(assignment_id)},
+                {"$push": {"submissions": submission}}
+            )
+            flash('Assignment submitted successfully', 'success')
+        else:
+            flash('You have already submitted this assignment', 'warning')
+            
+        return redirect(url_for('student_assignments'))
+    
+    # Find assignments for this student
+    # Note: In a real app, this would be more robust (matching subjects enrolled)
+    relevant_assignments = list(assignments_collection.find({"class": student_division}).sort("due_date", 1))
+    
+    # Process assignments to add 'submitted' status flag for UI
+    processed_assignments = []
+    for assign in relevant_assignments:
+        is_submitted = False
+        user_submission = None
+        for sub in assign.get('submissions', []):
+            if sub.get('student_id') == current_user.id:
+                is_submitted = True
+                user_submission = sub
+                break
+        
+        assign['submitted'] = is_submitted
+        assign['submission'] = user_submission
+        processed_assignments.append(assign)
+        
+    return render_template('student_assignments.html', user=current_user, assignments=processed_assignments)
+
 
 @app.route('/student/attendance')
 @login_required
@@ -1565,6 +1825,35 @@ def init_db():
         if not teachers_collection.find_one({"username": t["username"]}):
             teachers_collection.insert_one(t)
 
+# Placeholders for unimplemented features
+@app.route('/student/fees')
+@login_required
+def student_fees():
+    if current_user.role != 'student':
+        return redirect(url_for('home'))
+    return render_template('feature_placeholder.html', title="Fee Management", back_url=url_for('student_dashboard'))
+
+@app.route('/teacher/classes')
+@login_required
+def teacher_classes():
+    if current_user.role != 'teacher':
+        return redirect(url_for('home'))
+    return render_template('feature_placeholder.html', title="Class Management", back_url=url_for('teacher_dashboard'))
+
+@app.route('/admin/exams')
+@login_required
+def admin_exams():
+    if current_user.role != 'admin':
+        return redirect(url_for('home'))
+    return render_template('feature_placeholder.html', title="Examination Management", back_url=url_for('admin_dashboard'))
+
+@app.route('/admin/fees')
+@login_required
+def admin_fees():
+    if current_user.role != 'admin':
+        return redirect(url_for('home'))
+    return render_template('feature_placeholder.html', title="Fee & Finance", back_url=url_for('admin_dashboard'))
+
 # Initialize database on first run
 if __name__ == '__main__':
     # Create upload folder if it doesn't exist
@@ -1575,9 +1864,5 @@ if __name__ == '__main__':
     init_db()
     
     # Run the application
-if __name__ == "__main__":
-    init_db()
-
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
 

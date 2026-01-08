@@ -240,10 +240,30 @@
             <h3>Syllabus</h3>
             <p>Create and update course syllabus</p>
           </div></a>
-          <a href="{{ url_for('manage_notifications') }}" class="card-btn">
+          <a href="{{ url_for('teacher_notifications') }}" class="card-btn">
           <div class="card">
             <h3>Notifications</h3>
             <p>Publish important messages</p>
+          </div></a>
+          <a href="{{ url_for('teacher_profile') }}" class="card-btn">
+          <div class="card">
+            <h3>Profile</h3>
+            <p>View Personal Details</p>
+          </div></a>
+          <a href="{{ url_for('teacher_classes') }}" class="card-btn">
+          <div class="card">
+            <h3>Class Management</h3>
+            <p>Students & Batches</p>
+          </div></a>
+          <a href="{{ url_for('teacher_assignments') }}" class="card-btn">
+          <div class="card">
+            <h3>Assignments</h3>
+            <p>Create & Evaluate</p>
+          </div></a>
+          <a href="{{ url_for('teacher_leave_approval') }}" class="card-btn">
+          <div class="card">
+            <h3>Leave Approvals</h3>
+            <p>Manage Student Leaves</p>
           </div></a>
         </div>
         <div style="margin-top:40px;">
