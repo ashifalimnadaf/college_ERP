@@ -1864,5 +1864,10 @@ if __name__ == '__main__':
     init_db()
     
     # Run the application
+<<<<<<< HEAD
     app.run(debug=True)
+=======
+    app.run()
+
+>>>>>>> d622017044087cacf519aa865bb1f62b8c30ea69
 
